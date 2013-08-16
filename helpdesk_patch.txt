@@ -1,0 +1,236 @@
+diff --git vtigercrm/Smarty/templates/DetailViewUI.tpl vtigercrm/Smarty/templates/DetailViewUI.tpl
+index 218ad41..9061ef9 100644
+--- vtigercrm/Smarty/templates/DetailViewUI.tpl
++++ vtigercrm/Smarty/templates/DetailViewUI.tpl
+@@ -14,7 +14,7 @@
+ 
+ <!-- This file is used to display the fields based on the ui type in detailview -->
+ 		{if $keyid eq '1' || $keyid eq 2 || $keyid eq '11' || $keyid eq '7' || $keyid eq '9' || $keyid eq '55' || $keyid eq '71' || $keyid eq '72' || $keyid eq '103' || $keyid eq '255' || $keyid eq '14'} <!--TextBox-->
+-			<td width=25% class="dvtCellInfo" align="left" id="mouseArea_{$label}" onmouseover="hndMouseOver({$keyid},'{$label}');" onmouseout="fnhide('crmspanid');" valign="top">
++			<td width=25% class="dvtCellInfo" align="left" id="mouseArea_{$label}" onmouseover="hndMouseOver({$keyid},'{$label}');" onmouseout="fnhide('crmspanid');" >
+ 				{if $keyid eq '55' || $keyid eq '255'}<!--SalutationSymbol-->
+ 					{if $keyaccess eq $APP.LBL_NOT_ACCESSIBLE}
+ 						<font color='red'>{$APP.LBL_NOT_ACCESSIBLE}</font>
+diff --git vtigercrm/Smarty/templates/HelpDeskNotificationChange.tpl vtigercrm/Smarty/templates/HelpDeskNotificationChange.tpl
+new file mode 0
+index 0000000..0a0dc2f 0
+--- /dev/null
++++ vtigercrm/Smarty/templates/HelpDeskNotificationChange.tpl
+@@ -0,0 +1,66 @@
++<html>
++<head>
++{literal}
++
++<style>
++body {
++      font-family: Verdana, sans-serif;
++      font-size: 0.8em;
++      color:#484848;
++      }
++h1, h2, h3 { font-family: "Trebuchet MS", Verdana, sans-serif; margin: 0px; }
++h1 { font-size: 1.2em; }
++h2, h3 { font-size: 1.1em; }
++a, a:link, a:visited { color: #2A5685;}
++a:hover, a:active { color: #c61a1a; }
++a.wiki-anchor { display: none; }
++hr {
++		        width: 100%;
++			  height: 1px;
++			  background: #ccc;
++			  border: 0;
++			  }
++.footer {
++		        font-size: 0.8em;
++			font-style: italic;
++			}
++</style>
++</head>
++<body>
++{/literal}
++{$ticket_hello}
++<br>
++{$ticket_reply}
++<br>
++<ul>
++ <li> {$ticket_no} </li>
++ <li> {$ticket_status}    </li>
++ <li> {$ticket_category}  </li>
++ <li> {$ticket_severity}  </li>
++ <li> {$ticket_priority}  </li>
++</ul>
++<br>
++<br>
++<strong>{'Description'|@getTranslatedString:$MODULE} : </strong>
++<hr />
++
++{$ticket_description}
++<br><br>
++<strong>{'Solution'|@getTranslatedString:$MODULE} : </strong>
++<hr />
++{$ticket_solution}
++
++{$ticket_comments}
++<br><br>
++
++{foreach item=cfield from=$ticket_cfields}
++<br>
++{$cfield.cflabel} :  {$cfield.cfdata}<br>
++{/foreach}
++<br>
++{'LBL_REGARDS'|@getTranslatedString:$MODULE},<br>
++{'LBL_TEAM'|@getTranslatedString:$MODULE}
++
++</body>
++</html>
++
+diff --git vtigercrm/include/utils/CommonUtils.php vtigercrm/include/utils/CommonUtils.php
+index 4fac8c2..73f1f88 100644
+--- vtigercrm/include/utils/CommonUtils.php
++++ vtigercrm/include/utils/CommonUtils.php
+@@ -2392,11 +2392,11 @@
+ 	for ($i = 0; $i < $adb->num_rows($result); $i++) {
+ 		$comment = $adb->query_result($result, $i, 'comments');
+ 		if ($comment != '') {
+-			$commentlist .= '<br><br>' . $comment;
++			$commentlist .=  $comment . "<br><br><hr />";
+ 		}
+ 	}
+ 	if ($commentlist != '')
+-		$commentlist = '<br><br>' . getTranslatedString("The comments are", $moduleName) . ' : ' . $commentlist;
++		$commentlist = '<br><br><strong>' . getTranslatedString("The comments are", $moduleName) . ' : </strong><br><hr />' . $commentlist;
+ 
+ 	$log->debug("Exiting getTicketComments method ...");
+ 	return $commentlist;
+diff --git vtigercrm/modules/HelpDesk/HelpDesk.php vtigercrm/modules/HelpDesk/HelpDesk.php
+index c780df0..902bcd9 100644
+--- vtigercrm/modules/HelpDesk/HelpDesk.php
++++ vtigercrm/modules/HelpDesk/HelpDesk.php
+@@ -15,6 +15,8 @@
+ include_once('config.php');
+ require_once('include/logging.php');
+ require_once('include/utils/utils.php');
++require_once('Smarty_setup.php');
++
+ require_once('user_privileges/default_module_view.php');
+ 
+ class HelpDesk extends CRMEntity {
+@@ -465,8 +467,9 @@
+ 					}
+ 					$list .= $contact_name;
+ 				}
+-				$list .= ' on '.$adb->query_result($result,$i,'createdtime').' &nbsp;';
+-
++				$date = $adb->query_result($result,$i,'createdtime');
++				$time = explode(' ',$date);
++				$list .= ' on '. getValidDisplayDate($date) . ' &nbsp;' . $time[1];
+ 				$list .= '</font></div>';
+ 			}
+ 		}
+@@ -770,35 +773,53 @@
+ 		$wsParentId = $entityData->get('parent_id');
+ 		$parentIdParts = explode('x', $wsParentId);
+ 		$parentId = $parentIdParts[1];
+-		$desc = getTranslatedString('Ticket ID', $moduleName) . ' : ' . $entityId . '<br>'
+-				. getTranslatedString('Ticket Title', $moduleName) . ' : ' . $temp . ' '
+-				. $entityData->get('ticket_title');
+-		$desc .= "<br><br>" . getTranslatedString('Hi', $moduleName) . " " . getParentName($parentId) . ",<br><br>"
+-				. getTranslatedString('LBL_PORTAL_BODY_MAILINFO', $moduleName) . " " . $reply . " " . getTranslatedString('LBL_DETAIL', $moduleName) . "<br>";
+-		$desc .= "<br>" . getTranslatedString('Ticket No', $moduleName) . " : " . $entityData->get('ticket_no');
+-		$desc .= "<br>" . getTranslatedString('Status', $moduleName) . " : " . $entityData->get('ticketstatus');
+-		$desc .= "<br>" . getTranslatedString('Category', $moduleName) . " : " . $entityData->get('ticketcategories');
+-		$desc .= "<br>" . getTranslatedString('Severity', $moduleName) . " : " . $entityData->get('ticketseverities');
+-		$desc .= "<br>" . getTranslatedString('Priority', $moduleName) . " : " . $entityData->get('ticketpriorities');
+-		$desc .= "<br><br>" . getTranslatedString('Description', $moduleName) . " : <br>" . $entityData->get('description');
+-		$desc .= "<br><br>" . getTranslatedString('Solution', $moduleName) . " : <br>" . $entityData->get('solution');
+-		$desc .= getTicketComments($entityId);
++
++		$smarty = new vtigerCRM_Smarty();
++		$smarty->assign('MODULE',$moduleName);
++		$smarty->assign('ticket_hello',getTranslatedString('Hi', $moduleName) . " " . getParentName($parentId) );
++		$smarty->assign('ticket_reply',getTranslatedString('LBL_PORTAL_BODY_MAILINFO', $moduleName) . " " . $reply . " " . getTranslatedString('LBL_DETAIL', $moduleName));
++		$smarty->assign('ticket_no',getTranslatedString('Ticket No', $moduleName) . " : " . $entityData->get('ticket_no'));
++		$smarty->assign('ticket_status',getTranslatedString('Status', $moduleName) . " : " . getTranslatedString($entityData->get('ticketstatus'), $modulename));
++		$smarty->assign('ticket_category',getTranslatedString('Category', $moduleName) . " : " . getTranslatedString($entityData->get('ticketcategories'), $modulename));
++		$smarty->assign('ticket_severity',getTranslatedString('Severity', $moduleName) . " : " . getTranslatedString($entityData->get('ticketseverities'), $modulename));
++		$smarty->assign('ticket_priority',getTranslatedString('Priority', $moduleName) . " : " . getTranslatedString($entityData->get('ticketpriorities'), $modulename));
++
++
++		$description = $entityData->get('description');
++		$description = str_replace("\n","<br>",$description);
++		$smarty->assign('ticket_description',$description);
++
++
++		
++		$solution = $entityData->get('solution');
++		$solution = str_replace("\n","<br>",$solution);
++		$smarty->assign('ticket_solution',$solution);
++
++			
++		$comments = getTicketComments($entityId);
++		$comments = str_replace("\n","<br>",$comments);
++		$smarty->assign('ticket_comments',$comments);
+ 
++		/* display custom fields, that may have been added */
+ 		$sql = "SELECT * FROM vtiger_ticketcf WHERE ticketid = ?";
+-		$result = $adb->pquery($sql, array($id));
++		$result = $adb->pquery($sql, array($entityId));
+ 		$cffields = $adb->getFieldsArray($result);
++
++		// custom fields
++
++	        $cfarray = array();
+ 		foreach ($cffields as $cfOneField) {
+ 			if ($cfOneField != 'ticketid') {
+ 				$cfData = $adb->query_result($result, 0, $cfOneField);
+ 				$sql = "SELECT fieldlabel FROM vtiger_field WHERE columnname = ? and vtiger_field.presence in (0,2)";
+ 				$cfLabel = $adb->query_result($adb->pquery($sql, array($cfOneField)), 0, 'fieldlabel');
+-				$desc .= '<br><br>' . $cfLabel . ' : <br>' . $cfData;
++				array_push($cfarray,array('cflabel' => $cfLabel,'cfdata'=> $cfData)); 				
+ 			}
+ 		}
++		$smarty->assign('ticket_cfields', $cfarray);
+ 		// end of contribution
+-		$desc .= '<br><br><br>';
+-		$desc .= '<br>' . getTranslatedString("LBL_REGARDS", $moduleName) . ',<br>' . getTranslatedString("LBL_TEAM", $moduleName) . '.<br>';
+-		return $desc;
++
++		return $smarty->fetch('HelpDeskNotificationChange.tpl');
+ 	}
+ 
+ 	public static function getPortalTicketEmailContents($entityData) {
+@@ -817,7 +838,7 @@
+ 				. getTranslatedString('LBL_TICKET_DETAILS', $moduleName) . "</a>";
+ 		$contents = getTranslatedString('Dear', $moduleName) . " " . getParentName(parentId) . ",<br><br>";
+ 		$contents .= getTranslatedString('reply', $moduleName) . ' <b>' . $entityData->get('ticket_title')
+-				. '</b>' . getTranslatedString('customer_portal', $moduleName);
++				. '</b> ' . getTranslatedString('customer_portal', $moduleName);
+ 		$contents .= getTranslatedString("link", $moduleName) . '<br>';
+ 		$contents .= $portalUrl;
+ 		$contents .= '<br><br>' . getTranslatedString("Thanks", $moduleName) . '<br><br>' . getTranslatedString("Support_team", $moduleName);
+diff --git vtigercrm/modules/HelpDesk/HelpDeskHandler.php vtigercrm/modules/HelpDesk/HelpDeskHandler.php
+index 11d15a5..8fbc946 100644
+--- vtigercrm/modules/HelpDesk/HelpDeskHandler.php
++++ vtigercrm/modules/HelpDesk/HelpDeskHandler.php
+@@ -133,8 +133,8 @@
+ 		$reply = '';
+ 	}
+ 
+-	$subject = $entityData->get('ticket_no') . ' [ '.getTranslatedString('LBL_TICKET_ID', $moduleName)
+-						.' : '.$entityId.' ] '.$reply.$entityData->get('ticket_title');
++
++	$subject = '[' . $entityData->get('ticket_no').'] ' . $reply.$entityData->get('ticket_title');
+ 	$bodysubject = getTranslatedString('Ticket No', $moduleName) .":<br>" . $entityData->get('ticket_no')
+ 						. "<br>" . getTranslatedString('LBL_TICKET_ID', $moduleName).' : '.$entityId.'<br> '
+ 						.getTranslatedString('LBL_SUBJECT', $moduleName).$entityData->get('ticket_title');
+@@ -221,9 +221,9 @@
+ 	} else {
+ 		$reply = '';
+ 	}
++
+ 
+-	$subject = $entityData->get('ticket_no') . ' [ '.getTranslatedString('LBL_TICKET_ID', $moduleName)
+-						.' : '.$entityId.' ] '.$reply.$entityData->get('ticket_title');
++	$subject = '['.$entityData->get('ticket_no') . '] ' . $reply.$entityData->get('ticket_title');
+ 
+ 	$email_body = HelpDesk::getTicketEmailContents($entityData);
+ 	if(PerformancePrefs::getBoolean('NOTIFY_OWNER_EMAILS', true) === true){
